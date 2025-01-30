@@ -15,6 +15,8 @@ from pytorch_custom_utils import save_load
 
 from beartype.typing import Tuple, Callable, List, Dict, Any
 from meshgpt_pytorch.typing import Float, Int, Bool, typecheck
+from meshgpt_pytorch.qinco import QINCo
+from meshgpt_pytorch.qinco_inference import QINCoInferenceWrapper
 
 from huggingface_hub import PyTorchModelHubMixin, hf_hub_download
 
@@ -430,6 +432,8 @@ class MeshAutoencoder(Module):
     @typecheck
     def __init__(
         self,
+        use_qinco=False,
+        use_qinco_wrapper=False,
         num_discrete_coors = 128,
         coor_continuous_range: Tuple[float, float] = (-1., 1.),
         dim_coor_embed = 64,
@@ -452,7 +456,7 @@ class MeshAutoencoder(Module):
         dim_codebook = 192,
         num_quantizers = 2,           # or 'D' in the paper
         codebook_size = 16384,        # they use 16k, shared codebook between layers
-        use_residual_lfq = True,      # whether to use the latest lookup-free quantization
+        use_residual_lfq = False,      # whether to use the latest lookup-free quantization
         rq_kwargs: dict = dict(
             quantize_dropout = True,
             quantize_dropout_cutoff_index = 1,
@@ -571,10 +575,25 @@ class MeshAutoencoder(Module):
 
         self.codebook_size = codebook_size
         self.num_quantizers = num_quantizers
+        self.use_qinco = use_qinco
+        self.use_qinco_wrapper = use_qinco_wrapper
 
         self.project_dim_codebook = nn.Linear(curr_dim, dim_codebook * self.num_vertices_per_face)
 
-        if use_residual_lfq:
+
+        if use_qinco:
+            self.quantizer = QINCo(config=dict(
+            _D=dim_codebook,             # Dimension of input vectors
+            _M=num_quantizers,           # Number of quantization steps
+            codebook_size=codebook_size, # Size of each step's codebook
+            B=8,                         # Beam size (adjust as needed)
+            A=None,                      # Sub-step candidates (optional)
+            qinco1_mode=False,           # Use default mode for QINCo
+            codebook_noise_init=0.1,     # Initialization noise for codebook
+            _data_mean=torch.zeros(dim_codebook),  # Mean for normalization
+            _data_std=1.0                # Std deviation for normalization
+        ))
+        elif use_residual_lfq:
             self.quantizer = ResidualLFQ(
                 dim = dim_codebook,
                 num_quantizers = num_quantizers,
@@ -817,9 +836,12 @@ class MeshAutoencoder(Module):
 
         face_embed = rearrange(face_embed, 'b ... d -> b (...) d')
 
-        # scatter mean
+        # Compute scatter mean for vertices
+        averaged_vertices = scatter_mean(vertices, faces_with_dim, face_embed, dim=-2)
 
-        averaged_vertices = scatter_mean(vertices, faces_with_dim, face_embed, dim = -2)
+        # Flatten for quantization
+        B, N, D = averaged_vertices.shape  # B: batch, N: num_vertices, D: vertex_dim
+        flatten_in = rearrange(averaged_vertices, 'b n d -> (b n) d')  # Flatten to [B*N, D]
 
         # mask out null vertex token
 
@@ -842,11 +864,26 @@ class MeshAutoencoder(Module):
         # maybe checkpoint the quantize fn
 
         if self.checkpoint_quantizer:
-            quantize_wrapper_fn = partial(checkpoint, quantize_wrapper_fn, use_reentrant = False)
+            quantize_wrapper_fn = partial(checkpoint, quantize_wrapper_fn, use_reentrant=False)
 
-        # residual VQ
+        # Perform quantization based on the quantizer type
+        if self.use_qinco:
+            if self.use_qinco_wrapper:
+                # Use QINCoInferenceWrapper
+                codes_2d, xhat_2d = self.quantizer.encode(flatten_in)
+                commit_loss = torch.tensor(0.0)  # Commit loss not directly used in wrapper
+            else:
+                # Use old QINCo
+                codes_2d, xhat_2d, losses = self.quantizer(flatten_in, step="train")
+                commit_loss = losses.get("commit_loss", torch.tensor(0.0, device=flatten_in.device))
 
-        quantized, codes, commit_loss = quantize_wrapper_fn((averaged_vertices, quantize_kwargs))
+            # Reshape quantized outputs
+            quantized = rearrange(xhat_2d, '(b n) d -> b n d', b=B, n=N)
+            codes_2d = rearrange(codes_2d, 'm (b n) -> b n m', b=B, n=N)
+            codes = codes_2d
+        else:
+            # OLD PATH (ResidualLFQ or ResidualVQ)
+            quantized, codes, commit_loss = quantize_wrapper_fn((averaged_vertices, quantize_kwargs))
 
         # gather quantized vertexes back to faces for decoding
         # now the faces have quantized vertices
@@ -912,7 +949,14 @@ class MeshAutoencoder(Module):
 
         # decode
 
-        quantized = self.quantizer.get_output_from_indices(codes)
+        # quantized = self.quantizer.get_output_from_indices(codes)
+        if isinstance(self.quantizer, QINCo):
+            # Use QINCoInferenceWrapper's optimized decode method
+            quantized = self.quantizer.decode(codes)
+        else:
+            # Handle other quantizers (e.g., LFQ)
+            quantized = self.quantizer.get_output_from_indices(codes)
+            
         quantized = rearrange(quantized, 'b (nf nvf) d -> b nf (nvf d)', nvf = self.num_vertices_per_face)
 
         decoded = self.decode(
@@ -1451,7 +1495,7 @@ class MeshTransformer(Module, PyTorchModelHubMixin):
         append_eos = True,
         cache = None,
         texts: List[str] | None = None,
-        text_embeds: Tensor | None = None,
+        lembeds: Tensor | None = None,
         cond_drop_prob = None
     ):
         # handle text conditions
@@ -1751,3 +1795,4 @@ class MeshTransformer(Module, PyTorchModelHubMixin):
         )
 
         return ce_loss
+

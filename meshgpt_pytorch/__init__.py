@@ -13,6 +13,9 @@ from meshgpt_pytorch.data import (
     cache_text_embeds_for_dataset, 
     cache_face_edges_for_dataset
 )
+
+from meshgpt_pytorch.qinco import QINCo
+from meshgpt_pytorch.qinco_inference import QINCoInferenceWrapper
  
 from meshgpt_pytorch.mesh_dataset import (
     MeshDataset

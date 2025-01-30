@@ -129,7 +129,7 @@ class MeshAutoencoderTrainer(Module):
             shuffle = True,
             batch_size = batch_size, 
             drop_last = True,
-            collate_fn = partial(custom_collate, pad_id = model.pad_id)
+            collate_fn = partial(custom_collate, pad_id = model.module.pad_id if hasattr(model, "module") else model.pad_id)
         )
 
         self.should_validate = exists(val_dataset)
