@@ -151,7 +151,7 @@ def load_shapenet(directory, per_category, variations):
 
                 # Check file size limit
                 file_size = os.path.getsize(file_path)
-                if file_size > 200  * 1024:  # 20 KB
+                if file_size > 200  * 1024:  # 200 KB
                     print(f"[DEBUG] Skipping '{file_path}' due to size ({file_size / 1024:.2f} KB).")
                     continue
 
@@ -168,7 +168,7 @@ def load_shapenet(directory, per_category, variations):
                     continue
 
                 # Check face count limit
-                if len(faces) > 1000:
+                if len(faces) > 200:
                     print(f"[DEBUG] Skipping '{file_path}' because it has too many faces ({len(faces)}).")
                     continue
 
