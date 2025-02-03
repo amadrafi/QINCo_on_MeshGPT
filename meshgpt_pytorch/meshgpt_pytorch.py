@@ -464,7 +464,7 @@ class MeshAutoencoder(Module):
         ),
         rvq_kwargs: dict = dict(
             kmeans_init = True,
-            threshold_ema_dead_code = 2,
+            threshold_ema_dead_code = 10,
         ),
         rlfq_kwargs: dict = dict(
             frac_per_sample_entropy = 1.,

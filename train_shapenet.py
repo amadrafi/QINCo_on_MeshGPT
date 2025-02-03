@@ -21,9 +21,6 @@ from meshgpt_pytorch.data import (
     derive_face_edges_from_faces
 ) 
 
-def is_distributed_initialized():
-    return dist.is_available() and dist.is_initialized()
-
 def get_mesh(file_path): 
     mesh = trimesh.load(file_path, force='mesh') 
     vertices = mesh.vertices.tolist()
@@ -162,7 +159,7 @@ def load_shapenet(directory, per_category, variations):
                     continue
 
                 # Check face count limit
-                if len(faces) > 300:
+                if len(faces) > 200:
                     print(f"[DEBUG] Skipping '{file_path}' because it has too many faces ({len(faces)}).")
                     continue
 
@@ -230,11 +227,10 @@ def main():
     dataset_path = working_dir / ("ShapeNetCore.v1.npz")
 
     codebookSize = 4096
-    quant = "qinco"
+    quant = "lfq"
 
     useQinco = True if quant == "qinco" else False
     useLfq = True if quant == "lfq" else False
-
     
          
     if not os.path.isfile(dataset_path):
@@ -283,7 +279,7 @@ def main():
 
     # Initialize Accelerator for distributed training
 
-    autoencoder.commit_loss_weight = 0.1 # Set dependant on the dataset size, on smaller datasets, 0.1 is fine, otherwise try from 0.25 to 0.4.
+    autoencoder.commit_loss_weight = 0.2 # Set dependant on the dataset size, on smaller datasets, 0.1 is fine, otherwise try from 0.25 to 0.4.
     autoencoder_trainer = MeshAutoencoderTrainer(model =autoencoder ,warmup_steps = 10, dataset = dataset, num_train_steps=100,
                                                  batch_size=batch_size,
                                                  grad_accum_every = grad_accum_every,
