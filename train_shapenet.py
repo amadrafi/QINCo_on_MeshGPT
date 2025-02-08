@@ -250,20 +250,6 @@ def main():
     #Empty Caches
     torch.cuda.empty_cache()
 
-#    autoencoder = MeshAutoencoder(
-#            decoder_dims_through_depth =  (128,) * 6 + (192,) * 12 + (256,) * 20 + (384,) * 6,
-#            codebook_size = codebookSize,  # Smaller vocab size will speed up the transformer training, however if you are training on meshes more then 250 triangle, I'd advice to use 16384 codebook size
-#            dim_codebook = 192,
-#            dim_area_embed = 8,
-#            dim_coor_embed = 8,
-#            dim_normal_embed = 8,
-#            dim_angle_embed = 4,
-#            attn_decoder_depth  = 4,
-#            attn_encoder_depth = 2,
-#            use_qinco= useQinco,
-#            use_residual_lfq = useLfq,
-#        ).to(device)
-
 #    same dimensions as demo_mesh
     autoencoder = MeshAutoencoder(
             decoder_dims_through_depth =  (128,) * 6 + (192,) * 12 + (256,) * 20 + (384,) * 6,

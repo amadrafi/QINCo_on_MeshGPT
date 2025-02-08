@@ -1,44 +1,28 @@
+import numpy as np
 import os
-from pathlib import Path
-from meshgpt_pytorch import MeshDataset
 
-def extract_label_distribution(npz_path):
-    """
-    Loads a MeshDataset from an .npz file and prints out the
-    distribution of labels (based on the 'texts' key).
-    """
+# Path to the NPZ file
+npz_path = "./shapenet/ShapeNetCore.v1/ShapeNetCore.v1.npz"
 
-    # 1. Load the dataset from the NPZ file
-    if not os.path.isfile(npz_path):
-        raise FileNotFoundError(f"NPZ file not found at: {npz_path}")
-    dataset = MeshDataset.load(npz_path)
+if not os.path.isfile(npz_path):
+    raise FileNotFoundError(f"NPZ file not found at: {npz_path}")
 
-    # 2. Gather all labels from the dataset
-    label_counts = {}
-    for i, item in enumerate(dataset.data):
-        label = item.get("texts", None)  # or whatever your label field is named
-        if label is None:
-            # If there's no label in this entry, skip or handle differently
-            continue
+# Load the NPZ file.
+# allow_pickle=True is required if you saved Python objects (like dictionaries)
+data_archive = np.load(npz_path, allow_pickle=True)
 
-        if label not in label_counts:
-            label_counts[label] = 0
-        label_counts[label] += 1
+# List the keys available in the NPZ file
+print("Keys in the NPZ file:", data_archive.files)
 
-    # 3. Print or return the distribution
-    total_entries = sum(label_counts.values())
-    print(f"Loaded dataset from: {npz_path}")
-    print(f"Total labeled entries: {total_entries}\n")
-    print("Label distribution:")
-    for label, count in label_counts.items():
-        print(f"  {label} : {count}")
+# Suppose the dataset was saved under the key 'data'
+if 'data' in data_archive.files:
+    dataset_data = data_archive['data']  # This is likely an array (or list) of dictionaries.
+    
+    # Extract labels (assuming the key for labels is 'texts')
+    labels = [entry['texts'] for entry in dataset_data if 'texts' in entry]
+    print("Extracted labels:")
+    for label in labels:
+        print(label)
+else:
+    print("The NPZ file does not contain a 'data' key; please check its structure.")
 
-
-def main():
-    # Update this path to point to your NPZ file
-    dataset_path = Path("./shapenet/ShapeNetCore.v1/ShapeNetCore.v1.npz")
-
-    extract_label_distribution(dataset_path)
-
-if __name__ == "__main__":
-    main()
