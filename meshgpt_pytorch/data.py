@@ -325,7 +325,7 @@ def derive_face_edges_from_faces(
     for face, face_edge_mask in zip(faces, face_edges_masks):
 
         shared_vertices = rearrange(face, 'i c -> i 1 c 1') == rearrange(face, 'j c -> 1 j 1 c')
-        num_shared_vertices = shared_vertices.any(dim = -1).sum(dim = -1)
+        num_shared_vertices = shared_vertices.any(-1).sum(-1)
 
         is_neighbor_face = (num_shared_vertices >= face_edges_vertices_threshold) & face_edge_mask
 

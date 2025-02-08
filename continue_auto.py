@@ -158,7 +158,7 @@ def main():
     project_name = "demo_mesh"
     working_dir = f'./{project_name}'
 
-    quant = "lfq"
+    quant = "rvq"
     codeSize = 4096
 
     useQinco = True if quant == "qinco" else False

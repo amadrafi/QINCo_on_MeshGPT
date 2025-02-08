@@ -232,6 +232,11 @@ def main():
     useQinco = True if quant == "qinco" else False
     useLfq = True if quant == "lfq" else False
     
+    accelerator = Accelerator()
+    device = accelerator.device
+
+    if accelerator.is_main_process:
+        print(f"Experiment: {quant} @ {codebookSize} with {project_name}")
          
     if not os.path.isfile(dataset_path):
         data = load_shapenet("./shapenet/ShapeNetCore.v1", 50, 10)
@@ -245,23 +250,32 @@ def main():
     #Empty Caches
     torch.cuda.empty_cache()
 
-    accelerator = Accelerator()
-    device = accelerator.device
+#    autoencoder = MeshAutoencoder(
+#            decoder_dims_through_depth =  (128,) * 6 + (192,) * 12 + (256,) * 20 + (384,) * 6,
+#            codebook_size = codebookSize,  # Smaller vocab size will speed up the transformer training, however if you are training on meshes more then 250 triangle, I'd advice to use 16384 codebook size
+#            dim_codebook = 192,
+#            dim_area_embed = 8,
+#            dim_coor_embed = 8,
+#            dim_normal_embed = 8,
+#            dim_angle_embed = 4,
+#            attn_decoder_depth  = 4,
+#            attn_encoder_depth = 2,
+#            use_qinco= useQinco,
+#            use_residual_lfq = useLfq,
+#        ).to(device)
 
-    if accelerator.is_main_process:
-        print(f"Experiment: {quant} @ {codebookSize} with {project_name}")
-
+#    same dimensions as demo_mesh
     autoencoder = MeshAutoencoder(
             decoder_dims_through_depth =  (128,) * 6 + (192,) * 12 + (256,) * 20 + (384,) * 6,
             codebook_size = codebookSize,  # Smaller vocab size will speed up the transformer training, however if you are training on meshes more then 250 triangle, I'd advice to use 16384 codebook size
             dim_codebook = 192,
-            dim_area_embed = 8,
-            dim_coor_embed = 8,
-            dim_normal_embed = 8,
-            dim_angle_embed = 4,
+            dim_area_embed = 16,
+            dim_coor_embed = 16,
+            dim_normal_embed = 16,
+            dim_angle_embed = 8,
             attn_decoder_depth  = 4,
             attn_encoder_depth = 2,
-            use_qinco= useQinco,
+            use_qinco=useQinco,
             use_residual_lfq = useLfq,
         ).to(device)
 
@@ -279,7 +293,7 @@ def main():
 
     # Initialize Accelerator for distributed training
 
-    autoencoder.commit_loss_weight = 0.2 # Set dependant on the dataset size, on smaller datasets, 0.1 is fine, otherwise try from 0.25 to 0.4.
+    autoencoder.commit_loss_weight = 0.1 # Set dependant on the dataset size, on smaller datasets, 0.1 is fine, otherwise try from 0.25 to 0.4.
     autoencoder_trainer = MeshAutoencoderTrainer(model =autoencoder ,warmup_steps = 10, dataset = dataset, num_train_steps=100,
                                                  batch_size=batch_size,
                                                  grad_accum_every = grad_accum_every,
