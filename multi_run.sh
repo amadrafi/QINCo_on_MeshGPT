@@ -33,4 +33,5 @@ source ~/venv3.12/bin/activate
 # Accelerate will detect the world size (# of nodes * gpus) automatically.
 # or it can read from your accelerate config file.
 
-srun accelerate launch --multi_gpu --mixed_precision=fp16 train_shapenet.py 
+# srun accelerate launch --multi_gpu --mixed_precision=fp16 train_shapenet.py 
+srun accelerate launch --multi_gpu train_shapenet.py 

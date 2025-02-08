@@ -60,7 +60,6 @@ def get_mesh(file_path):
     sorted_faces = [sorted(sub_arr) for sub_arr in reindexed_faces]   
     return np.array(sorted_vertices), np.array(sorted_faces)
  
- 
 
 def augment_mesh(vertices, scale_factor):     
     jitter_factor=0.01 
@@ -74,12 +73,6 @@ def augment_mesh(vertices, scale_factor):
     difference = -0.95 - min_y 
     vertices[:, 1] += difference
     return vertices
-
-import os
-import json
-import numpy as np
-import pandas as pd
-import torch
 
 def load_shapenet(directory, per_category, variations):
     obj_datas = []
@@ -162,7 +155,11 @@ def load_shapenet(directory, per_category, variations):
                     continue
 
                 # Load mesh (vertices, faces) - implement get_mesh yourself
-                vertices, faces = get_mesh(file_path)
+                try:
+                    vertices, faces = get_mesh(file_path)
+                except ValueError as e:
+                    print(f"[DEBUG] skipping {file_path} due to error: {e}")
+
                 if vertices is None or faces is None or len(vertices) == 0 or len(faces) == 0:
                     print(f"[DEBUG] get_mesh failed for '{file_path}' (vertices/faces are None or empty).")
                     continue
