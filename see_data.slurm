@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=meshgpt_training_job
-#SBATCH --output=print_output_%j.log      # Output file (%j for job ID)
+#SBATCH --output=data_output_%j.log      # Output file (%j for job ID)
 #SBATCH --account=module-mlp
-#SBATCH --error=print_error_%j.log        # Error file
+#SBATCH --error=data_error_%j.log        # Error file
 #SBATCH --time=7-00:00:00                   # Max runtime (HH:MM:SS)
 #SBATCH --partition=PGR-Standard                # Partition (use appropriate partition)
 #SBATCH --ntasks-per-node=1                      # Number of tasks (adjust as needed)
@@ -21,9 +21,5 @@ echo "GPUs per Task: $SLURM_GPUS_ON_NODE"
 # Run the Python script
 #srun python meshgpt-pytorch/train_autoencoder.py
 source ~/venv3.12/bin/activate
-# srun accelerate launch --multi-gpu train_auto.py
-# srun accelerate launch --multi-gpu train_shapenet.py
-# srun accelerate launch --multi-gpu continue_auto.py
-srun accelerate launch --multi-gpu train_transformer.py
-
+srun accelerate launch --multi-gpu see_data.py
 
