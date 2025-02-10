@@ -1496,6 +1496,7 @@ class MeshTransformer(Module, PyTorchModelHubMixin):
         cache = None,
         texts: List[str] | None = None,
         lembeds: Tensor | None = None,
+        text_embeds: Tensor | None = None,
         cond_drop_prob = None
     ):
         # handle text conditions

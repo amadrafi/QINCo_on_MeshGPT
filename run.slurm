@@ -22,6 +22,8 @@ echo "GPUs per Task: $SLURM_GPUS_ON_NODE"
 #srun python meshgpt-pytorch/train_autoencoder.py
 source ~/venv3.12/bin/activate
 # srun accelerate launch --multi-gpu train_auto.py
-srun accelerate launch --multi-gpu train_shapenet.py
+# srun accelerate launch --multi-gpu train_shapenet.py
 # srun accelerate launch --multi-gpu continue_auto.py
+srun accelerate launch --multi-gpu train_transformer.py
+
 
