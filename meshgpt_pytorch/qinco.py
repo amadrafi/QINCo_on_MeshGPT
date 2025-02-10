@@ -183,7 +183,7 @@ class QINCoStep(nn.Module):
 
         # Optionally you can add small MLP or sub-step logic
 
-    def forward(self, residual: torch.Tensor):
+    def forward(self, residual: torch.Tensor, chunk_size: int = 1024):
         """
         Single-step quantization at training time:
           1) For each sample in residual, find nearest code in self.codebook
@@ -195,14 +195,39 @@ class QINCoStep(nn.Module):
           codes_i: shape [Bn]
           quant_i: shape [Bn, D]
         """
+        # Bn, D = residual.shape
+        # # naive nearest-neighbor approach
+        # # broadcast: [Bn, 1, D] - [1, codebook_size, D] => [Bn, codebook_size, D]
+        # diff = residual.unsqueeze(1) - self.codebook.unsqueeze(0)  
+        # dist = (diff ** 2).sum(dim=-1)  # [Bn, codebook_size]
+        # codes_i = dist.argmin(dim=-1)   # [Bn]
+        # # gather the codebook vectors
+        # quant_i = self.codebook[codes_i]  # shape [Bn, D]
+        # return codes_i, quant_i
+
         Bn, D = residual.shape
-        # naive nearest-neighbor approach
-        # broadcast: [Bn, 1, D] - [1, codebook_size, D] => [Bn, codebook_size, D]
-        diff = residual.unsqueeze(1) - self.codebook.unsqueeze(0)  
-        dist = (diff ** 2).sum(dim=-1)  # [Bn, codebook_size]
-        codes_i = dist.argmin(dim=-1)   # [Bn]
-        # gather the codebook vectors
-        quant_i = self.codebook[codes_i]  # shape [Bn, D]
+        all_codes = []
+        all_quant = []
+        
+        # Process the input in smaller chunks.
+        for start in range(0, Bn, chunk_size):
+            end = min(start + chunk_size, Bn)
+            residual_chunk = residual[start:end]  # shape: [chunk_size, D]
+            
+            # Use the efficient distance computation
+            residual_norm = (residual_chunk ** 2).sum(dim=1, keepdim=True)  # [chunk_size, 1]
+            codebook_norm = (self.codebook ** 2).sum(dim=1).unsqueeze(0)  # [1, codebook_size]
+            inner_prod = residual_chunk @ self.codebook.t()  # [chunk_size, codebook_size]
+            dist_chunk = residual_norm + codebook_norm - 2 * inner_prod  # [chunk_size, codebook_size]
+            
+            codes_chunk = dist_chunk.argmin(dim=-1)  # [chunk_size]
+            quant_chunk = self.codebook[codes_chunk]  # [chunk_size, D]
+            
+            all_codes.append(codes_chunk)
+            all_quant.append(quant_chunk)
+        
+        codes_i = torch.cat(all_codes, dim=0)
+        quant_i = torch.cat(all_quant, dim=0)
         return codes_i, quant_i
 
     def get_code_vectors(self, codes_i: torch.Tensor):

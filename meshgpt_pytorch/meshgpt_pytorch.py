@@ -922,6 +922,7 @@ class MeshAutoencoder(Module):
             x = ff(x) + x
 
         x = rearrange(x, 'b n d -> b d n')
+        conv_face_mask = conv_face_mask.to(x.device)
         x = x.masked_fill(~conv_face_mask, 0.)
         x = self.init_decoder_conv(x)
 
@@ -964,7 +965,9 @@ class MeshAutoencoder(Module):
             face_mask = face_mask
         )
 
-        decoded = decoded.masked_fill(~face_mask[..., None], 0.)
+        # decoded = decoded.masked_fill(~face_mask[..., None], 0.)
+        decoded = decoded.masked_fill(~face_mask.to(decoded.device)[..., None], 0.)
+
         pred_face_coords = self.to_coor_logits(decoded)
 
         pred_face_coords = pred_face_coords.argmax(dim = -1)
@@ -981,7 +984,9 @@ class MeshAutoencoder(Module):
 
         # mask out with nan
 
-        continuous_coors = continuous_coors.masked_fill(~rearrange(face_mask, 'b nf -> b nf 1 1'), float('nan'))
+        # continuous_coors = continuous_coors.masked_fill(~rearrange(face_mask, 'b nf -> b nf 1 1'), float('nan'))
+        continuous_coors = continuous_coors.masked_fill(~rearrange(face_mask.to(continuous_coors.device), 'b nf -> b nf 1 1'), float('nan'))
+
 
         if not return_discrete_codes:
             return continuous_coors, face_mask

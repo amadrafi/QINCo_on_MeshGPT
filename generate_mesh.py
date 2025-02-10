@@ -14,7 +14,8 @@ from meshgpt_pytorch import (
     MeshAutoencoderTrainer,
     MeshAutoencoder,
     MeshTransformer,
-    MeshDataset
+    MeshDataset,
+    mesh_render
 )
 from meshgpt_pytorch.data import ( 
     derive_face_edges_from_faces
@@ -127,30 +128,22 @@ def main():
     if accelerator.is_main_process:
         print(dataset.data[0].keys())
 
-    batch_size = 2  # Max 64
-    grad_accum_every = 16
-    
-    # Set the maximal batch size (max 64) that your VRAM can handle, and use grad_accum_every to create an effective batch size of 64 (e.g., 4 * 16 = 64)
-    learning_rate = 1e-2  # Start training with a higher learning rate, then lower it if stagnation occurs.
-    
-    trainer = MeshTransformerTrainer(
-        model=transformer,
-        warmup_steps=10,
-        num_train_steps=100,
-        dataset=dataset,
-        grad_accum_every=grad_accum_every,
-        learning_rate=learning_rate,
-        batch_size=batch_size,
-        checkpoint_every_epoch=5,
-        # Uncomment below for FP16 training if desired (note: may cause nan issues)
-        # accelerator_kwargs={"mixed_precision": "fp16"},
-        # optimizer_kwargs={"eps": 1e-7}
-    )
-    loss = trainer.train(300, stop_at_loss=0.0001)
+    pkg = torch.load(str(f'{working_dir}/mesh-transformer_{project_name}_{quant}_{codeSize}.pt'), weights_only=True) 
+    transformer.load_state_dict(pkg['model'])
 
-    # Save the trained transformer model.
-    save_path = working_dir / f"mesh-transformer_{project_name}_{quant}_{codeSize}.pt"
-    trainer.save(str(save_path))   
+    if accelerator.is_main_process:
+        print(f"Successfully loaded model {quant} @ {codeSize}")
+
+    folder = working_dir / 'renders'
+    obj_file_path = Path(folder)
+    obj_file_path.mkdir(exist_ok = True, parents = True)  
+    
+    text_coords = [] 
+    for text in labels[:10]:
+        print(f"Generating {text}") 
+        text_coords.append(transformer.generate(texts = [text],  temperature = 0.0))   
+        
+    mesh_render.save_rendering(f'{folder}/3d_models_all.obj', text_coords)
 
 if __name__ == "__main__":
     main()
