@@ -24,6 +24,7 @@ source ~/venv3.12/bin/activate
 # srun accelerate launch --multi-gpu train_auto.py
 # srun accelerate launch --multi-gpu train_shapenet.py
 # srun accelerate launch --multi-gpu continue_auto.py
-srun accelerate launch --multi-gpu inspect_auto.py --quant lfq --codeSize 4096
+# srun accelerate launch --multi-gpu inspect_auto.py --quant lfq --codeSize 4096
+srun accelerate launch --multi-gpu continue_auto_shapenet.py --quant qinco --codeSize 4096
 
 

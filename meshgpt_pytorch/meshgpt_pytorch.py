@@ -949,11 +949,18 @@ class MeshAutoencoder(Module):
         codes = rearrange(codes, 'b (n q) -> b n q', q = self.num_quantizers)
 
         # decode
-
         # quantized = self.quantizer.get_output_from_indices(codes)
         if isinstance(self.quantizer, QINCo):
             # Use QINCoInferenceWrapper's optimized decode method
-            quantized = self.quantizer.decode(codes)
+            B, n, _ = codes.shape
+        
+            # Rearrange to shape [num_quantizers, B*n]
+            codes_for_decode = rearrange(codes, 'b n m -> m (b n)')
+            
+            # Decode: QINCo._decode returns a tensor of shape [(B*n), D]
+            quantized = self.quantizer._decode(codes_for_decode)
+
+            quantized = rearrange(quantized, '(b n) d -> b n d', b=B)
         else:
             # Handle other quantizers (e.g., LFQ)
             quantized = self.quantizer.get_output_from_indices(codes)
@@ -969,9 +976,7 @@ class MeshAutoencoder(Module):
         decoded = decoded.masked_fill(~face_mask.to(decoded.device)[..., None], 0.)
 
         pred_face_coords = self.to_coor_logits(decoded)
-
         pred_face_coords = pred_face_coords.argmax(dim = -1)
-
         pred_face_coords = rearrange(pred_face_coords, '... (v c) -> ... v c', v = self.num_vertices_per_face)
 
         # back to continuous space

@@ -31,10 +31,9 @@ def main():
                         help="Type of quantization to use (default: lfq)")
     parser.add_argument("--codeSize", type=int, default=4096,
                         help="Codebook size for the mesh autoencoder (default: 4096)")
+    parser.add_argument("--data", type=str, default='demo_mesh', choices=["demo_mesh", "shapenet"],
+                        help="Please choose choose the correct data set")
     args = parser.parse_args()
-
-    project_name = "demo_mesh"
-    working_dir = f'./{project_name}'
 
     quant = args.quant
     codeSize = args.codeSize
@@ -45,15 +44,29 @@ def main():
     accelerator = Accelerator()
     device = accelerator.device
 
+    if args.data == "demo_mesh":
+        project_name = "demo_mesh"
+    elif args.data == "shapenet":
+        project_name = "shapenet/ShapeNetCore.v1"
+    
     if accelerator.is_main_process:
         print(f"Experiment: {quant} @ {codeSize} with {project_name}")
- 
+    
+    working_dir = f'./{project_name}'
     working_dir = Path(working_dir)
     working_dir.mkdir(exist_ok=True, parents=True)
-    dataset_path = working_dir / (project_name + ".npz")
+
+    if args.data == "demo_mesh":
+        dataset_path = working_dir / (project_name + ".npz")
+    elif args.data == "shapenet":
+        dataset_path = working_dir / ("ShapeNetCore.v1.npz")
 
     if not os.path.isfile(dataset_path):
-        data = load_filename("./demo_mesh", 50)
+        if args.data == "demo_mesh":
+            data = load_filename("./demo_mesh", 50)
+        elif args.data == "shapenet":
+            data = load_shapenet("./shapenet/ShapeNetCore.v1", 50, 10)
+        
         dataset = MeshDataset(data)
         dataset.generate_face_edges()
         dataset.save(dataset_path)
@@ -85,7 +98,10 @@ def main():
         print(f"Length of dataset: {len(dataset.data)}")
 
     # Load the pre-trained autoencoder weights.
-    ckpt_path = Path(f'{working_dir}') / f'mesh-encoder_{project_name}_{quant}_{codeSize}.ckpt.pt'
+    if args.data == "demo_mesh":
+        ckpt_path = Path(f'{working_dir}') / f'mesh-encoder_{project_name}_{quant}_{codeSize}.ckpt.pt'
+    elif args.data == "shapenet":
+        ckpt_path = Path(f'{working_dir}') / f'mesh-encoder_shapenet_{quant}_{codeSize}.ckpt.pt'
     pkg = torch.load(str(ckpt_path), weights_only=True) 
     autoencoder.load_state_dict(pkg['model'])
     for param in autoencoder.parameters():
@@ -115,7 +131,7 @@ def main():
         dropout=0.0,
         text_condition_model_types="bge", 
         text_condition_cond_drop_prob=0.0
-    ) 
+    ).to(device)
     
     total_params = sum(p.numel() for p in transformer.decoder.parameters())
     total_params = f"{total_params / 1000000:.1f}M"
@@ -128,7 +144,10 @@ def main():
     if accelerator.is_main_process:
         print(dataset.data[0].keys())
 
-    pkg = torch.load(str(f'{working_dir}/mesh-transformer_{project_name}_{quant}_{codeSize}.pt'), weights_only=True) 
+    if args.data == "demo_mesh":
+        pkg = torch.load(str(f'{working_dir}/mesh-transformer_{project_name}_{quant}_{codeSize}.pt'), weights_only=True) 
+    elif args.data == "shapenet":
+        pkg = torch.load(str(f'{working_dir}/mesh-transformer_shapenet_{quant}_{codeSize}.ckpt.pt'), weights_only=True) 
     transformer.load_state_dict(pkg['model'])
 
     if accelerator.is_main_process:

@@ -3,6 +3,7 @@
 import torch
 import trimesh
 import numpy as np
+import pandas as pd
 import os
 import json
 from collections import OrderedDict
@@ -66,6 +67,7 @@ def augment_mesh(vertices, scale_factor):
 def load_shapenet(directory, per_category, variations):
     obj_datas = []
     chosen_models_count = {}
+    counter = 0
     print(f"per_category: {per_category}, variations: {variations}")
 
     metadata_file = os.path.join(directory, "shapenet_labels.json")
@@ -131,7 +133,7 @@ def load_shapenet(directory, per_category, variations):
                 file_size = os.path.getsize(file_path)
                 if file_size > 200  * 1024:  # 20 KB
                     print(f"[DEBUG] Skipping '{file_path}' due to size ({file_size / 1024:.2f} KB).")
-                    break
+                    continue
 
                 # Check if JSON metadata has an entry for this file’s base name (minus extension)
                 base_name = os.path.splitext(filename)[0]
@@ -148,7 +150,7 @@ def load_shapenet(directory, per_category, variations):
                 # Check face count limit
                 if len(faces) > 200:
                     print(f"[DEBUG] Skipping '{file_path}' because it has too many faces ({len(faces)}).")
-                    break
+                    continue
 
                 # If we reached here, the model is eligible
                 chosen_models_count[category] += 1

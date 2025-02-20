@@ -31,6 +31,9 @@ def main():
     parser.add_argument("--codeSize", type=int, default=4096,
                         help="Codebook size for the mesh autoencoder (default: 4096)")
     args = parser.parse_args()
+
+    project_name = "shapenet/ShapeNetCore.v1" 
+    working_dir = f'./{project_name}'
     
     quant = args.quant
     codeSize = args.codeSize
@@ -44,8 +47,6 @@ def main():
     if accelerator.is_main_process:
         print(f"Experiment: {quant} @ {codeSize} with {project_name}")
  
-    project_name = "shapenet/ShapeNetCore.v1" 
-    working_dir = f'./{project_name}'
     working_dir = Path(working_dir)
     working_dir.mkdir(exist_ok = True, parents = True)
     dataset_path = working_dir / ("ShapeNetCore.v1.npz")
@@ -126,6 +127,11 @@ def main():
     if accelerator.is_main_process:
         print(dataset.data[0].keys())
 
+    pkg = torch.load(str(f'{working_dir}/mesh-transformer_shapenet_{quant}_{codeSize}.ckpt.pt'), weights_only=True) 
+    transformer.load_state_dict(pkg['model'])
+
+    if accelerator.is_main_process:
+        print(f"Successfully loaded transformer {quant} @ {codeSize}")
     batch_size = 2  # Max 64
     grad_accum_every = 16
     
