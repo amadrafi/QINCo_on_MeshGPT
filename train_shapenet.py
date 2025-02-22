@@ -20,55 +20,73 @@ from meshgpt_pytorch import (
 from meshgpt_pytorch.data import ( 
     derive_face_edges_from_faces
 ) 
-
+import argparse  # Added for command-line arguments
 from helper import get_mesh, augment_mesh, load_shapenet, load_filename
 
 def main():
-    project_name = "shapenet/ShapeNetCore.v1" 
-    working_dir = f'./{project_name}'
-    
-    working_dir = Path(working_dir)
-    working_dir.mkdir(exist_ok = True, parents = True)
-    dataset_path = working_dir / ("ShapeNetCore.v1.npz")
+    # Parse command-line arguments for quant and codeSize.
+    parser = argparse.ArgumentParser(description="Mesh GPT Training Script")
+    parser.add_argument("--quant", type=str, default="lfq", choices=["lfq", "qinco", "rvq"],
+                        help="Type of quantization to use (default: lfq)")
+    parser.add_argument("--codeSize", type=int, default=4096,
+                        help="Codebook size for the mesh autoencoder (default: 4096)")
+    parser.add_argument("--data", type=str, default='demo_mesh', choices=["demo_mesh", "shapenet"],
+                        help="Please choose choose the correct data set")
+    args = parser.parse_args()
 
-    codebookSize = 4096
-    quant = "lfq"
+    quant = args.quant
+    codeSize = args.codeSize
+    whichData = args.data
 
     useQinco = True if quant == "qinco" else False
     useLfq = True if quant == "lfq" else False
-    
+
     accelerator = Accelerator()
     device = accelerator.device
 
+    if args.data == "demo_mesh":
+        project_name = "demo_mesh"
+    elif args.data == "shapenet":
+        project_name = "shapenet/ShapeNetCore.v1"
+    
     if accelerator.is_main_process:
-        print(f"Experiment: {quant} @ {codebookSize} with {project_name}")
-         
+        print(f"Experiment: {quant} @ {codeSize} with {project_name}")
+    
+    working_dir = f'./{project_name}'
+    working_dir = Path(working_dir)
+    working_dir.mkdir(exist_ok=True, parents=True)
+
+    if args.data == "demo_mesh":
+        dataset_path = working_dir / (project_name + ".npz")
+    elif args.data == "shapenet":
+        dataset_path = working_dir / ("ShapeNetCore.v1_200.npz")
+
     if not os.path.isfile(dataset_path):
-        data = load_shapenet("./shapenet/ShapeNetCore.v1", 50, 10)
-        dataset = MeshDataset(data) 
-        dataset.generate_face_edges()  
+        if args.data == "demo_mesh":
+            data = load_filename("./demo_mesh", 50)
+        elif args.data == "shapenet":
+            data = load_shapenet("./shapenet/ShapeNetCore.v1", 50, 10)
+        
+        dataset = MeshDataset(data)
+        dataset.generate_face_edges()
         dataset.save(dataset_path)
-     
-    dataset = MeshDataset.load(dataset_path) 
+
+    dataset = MeshDataset.load(dataset_path)
     print(dataset.data[0].keys())
 
-    #Empty Caches
-    torch.cuda.empty_cache()
-
-#    same dimensions as demo_mesh
     autoencoder = MeshAutoencoder(
-            decoder_dims_through_depth =  (128,) * 6 + (192,) * 12 + (256,) * 20 + (384,) * 6,
-            codebook_size = codebookSize,  # Smaller vocab size will speed up the transformer training, however if you are training on meshes more then 250 triangle, I'd advice to use 16384 codebook size
-            dim_codebook = 192,
-            dim_area_embed = 16,
-            dim_coor_embed = 16,
-            dim_normal_embed = 16,
-            dim_angle_embed = 8,
-            attn_decoder_depth  = 4,
-            attn_encoder_depth = 2,
-            use_qinco=useQinco,
-            use_residual_lfq = useLfq,
-        ).to(device)
+        decoder_dims_through_depth=(128,) * 6 + (192,) * 12 + (256,) * 20 + (384,) * 6,
+        codebook_size=codeSize,  # Smaller vocab size will speed up transformer training; for larger meshes consider larger sizes.
+        dim_codebook=192,
+        dim_area_embed=16,
+        dim_coor_embed=16,
+        dim_normal_embed=16,
+        dim_angle_embed=8,
+        attn_decoder_depth=4,
+        attn_encoder_depth=2,
+        use_qinco=useQinco,
+        use_residual_lfq=useLfq,
+    ).to(device)
 
     total_params = sum(p.numel() for p in autoencoder.parameters())
     total_params = f"{total_params / 1000000:.1f}M"
@@ -94,7 +112,7 @@ def main():
                                              )
     loss = autoencoder_trainer.train(10000,stop_at_loss = 0.2, diplay_graph= True)
 
-    autoencoder_trainer.save(f'{working_dir}/mesh-encoder_shapenet_{quant}_{codebookSize}.pt')
+    autoencoder_trainer.save(f'{working_dir}/mesh-encoder_{whichData}_{quant}_{codebookSize}_200faces.pt')
 
 if __name__ == "__main__":
     main()

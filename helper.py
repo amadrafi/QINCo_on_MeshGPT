@@ -9,46 +9,124 @@ import json
 from collections import OrderedDict
 from meshgpt_pytorch.data import derive_face_edges_from_faces
 
-def get_mesh(file_path): 
-    mesh = trimesh.load(file_path, force='mesh') 
-    vertices = mesh.vertices.tolist()
-    if ".off" in file_path:  # ModelNet dataset
-       mesh.vertices[:, [1, 2]] = mesh.vertices[:, [2, 1]] 
-       rotation_matrix = trimesh.transformations.rotation_matrix(np.radians(-90), [0, 1, 0])
-       mesh.apply_transform(rotation_matrix) 
-        # Extract vertices and faces from the rotated mesh
-       vertices = mesh.vertices.tolist()
+# def get_mesh(file_path): 
+    # mesh = trimesh.load(file_path, force='mesh') 
+    # vertices = mesh.vertices.tolist()
+    # if ".off" in file_path:  # ModelNet dataset
+    #    mesh.vertices[:, [1, 2]] = mesh.vertices[:, [2, 1]] 
+    #    rotation_matrix = trimesh.transformations.rotation_matrix(np.radians(-90), [0, 1, 0])
+    #    mesh.apply_transform(rotation_matrix) 
+    #     # Extract vertices and faces from the rotated mesh
+    #    vertices = mesh.vertices.tolist()
             
-    faces = mesh.faces.tolist()
+    # faces = mesh.faces.tolist()
     
-    centered_vertices = vertices - np.mean(vertices, axis=0)  
-    max_abs = np.max(np.abs(centered_vertices))
-    vertices = centered_vertices / (max_abs / 0.95)     # Limit vertices to [-0.95, 0.95]
+    # centered_vertices = vertices - np.mean(vertices, axis=0)  
+    # max_abs = np.max(np.abs(centered_vertices))
+    # vertices = centered_vertices / (max_abs / 0.95)     # Limit vertices to [-0.95, 0.95]
       
-    min_y = np.min(vertices[:, 1]) 
-    difference = -0.95 - min_y 
-    vertices[:, 1] += difference
+    # min_y = np.min(vertices[:, 1]) 
+    # difference = -0.95 - min_y 
+    # vertices[:, 1] += difference
     
-    def sort_vertices(vertex):
-        return vertex[1], vertex[2], vertex[0]   
+    # def sort_vertices(vertex):
+    #     return vertex[1], vertex[2], vertex[0]   
  
-    seen = OrderedDict()
-    for point in vertices: 
-      key = tuple(point)
-      if key not in seen:
-        seen[key] = point
+    # seen = OrderedDict()
+    # for point in vertices: 
+    #   key = tuple(point)
+    #   if key not in seen:
+    #     seen[key] = point
         
-    unique_vertices =  list(seen.values()) 
+    # unique_vertices =  list(seen.values()) 
+    # sorted_vertices = sorted(unique_vertices, key=sort_vertices)
+      
+    # vertices_as_tuples = [tuple(v) for v in vertices]
+    # sorted_vertices_as_tuples = [tuple(v) for v in sorted_vertices]
+
+    # vertex_map = {old_index: new_index for old_index, vertex_tuple in enumerate(vertices_as_tuples) for new_index, sorted_vertex_tuple in enumerate(sorted_vertices_as_tuples) if vertex_tuple == sorted_vertex_tuple} 
+    # reindexed_faces = [[vertex_map[face[0]], vertex_map[face[1]], vertex_map[face[2]]] for face in faces] 
+    # sorted_faces = [sorted(sub_arr) for sub_arr in reindexed_faces]   
+    # return np.array(sorted_vertices), np.array(sorted_faces)
+
+def get_mesh(file_path):
+    try:
+        mesh = trimesh.load(file_path, force='mesh')
+    except Exception as e:
+        print(f"[DEBUG] Failed to load mesh from '{file_path}': {e}")
+        return None, None
+
+    # Convert vertices to a NumPy array for proper arithmetic operations.
+    vertices = np.array(mesh.vertices)
+    
+    # If it's an .off file, apply the specific ModelNet transformations.
+    if ".off" in file_path:
+        mesh.vertices[:, [1, 2]] = mesh.vertices[:, [2, 1]]
+        rotation_matrix = trimesh.transformations.rotation_matrix(np.radians(-90), [0, 1, 0])
+        mesh.apply_transform(rotation_matrix)
+        vertices = np.array(mesh.vertices)
+    
+    faces = np.array(mesh.faces)
+    
+    # Check if vertices or faces are empty.
+    if vertices.size == 0:
+        print(f"[DEBUG] get_mesh: No vertices loaded from '{file_path}'. Skipping.")
+        return None, None
+    if faces.size == 0:
+        print(f"[DEBUG] get_mesh: No faces loaded from '{file_path}'. Skipping.")
+        return None, None
+
+    # Center the vertices by subtracting the mean.
+    centered_vertices = vertices - np.mean(vertices, axis=0)
+    if centered_vertices.size == 0:
+        print(f"[DEBUG] get_mesh: Centered vertices array is empty for '{file_path}'. Skipping.")
+        return None, None
+
+    # Compute maximum absolute value. Avoid error if array is empty or max_abs is zero.
+    max_abs = np.max(np.abs(centered_vertices))
+    if max_abs == 0:
+        print(f"[DEBUG] get_mesh: Maximum absolute value is zero for '{file_path}'. Skipping.")
+        return None, None
+
+    # Normalize vertices to limit them to [-0.95, 0.95].
+    vertices = centered_vertices / (max_abs / 0.95)
+    
+    # Adjust y-coordinate to ensure the model is on the "ground".
+    min_y = np.min(vertices[:, 1])
+    difference = -0.95 - min_y
+    vertices[:, 1] += difference
+
+    # Sort and re-index vertices.
+    def sort_vertices(vertex):
+        return vertex[1], vertex[2], vertex[0]
+    
+    seen = OrderedDict()
+    for point in vertices:
+        key = tuple(point)
+        if key not in seen:
+            seen[key] = point
+            
+    unique_vertices = list(seen.values())
     sorted_vertices = sorted(unique_vertices, key=sort_vertices)
       
     vertices_as_tuples = [tuple(v) for v in vertices]
     sorted_vertices_as_tuples = [tuple(v) for v in sorted_vertices]
 
-    vertex_map = {old_index: new_index for old_index, vertex_tuple in enumerate(vertices_as_tuples) for new_index, sorted_vertex_tuple in enumerate(sorted_vertices_as_tuples) if vertex_tuple == sorted_vertex_tuple} 
-    reindexed_faces = [[vertex_map[face[0]], vertex_map[face[1]], vertex_map[face[2]]] for face in faces] 
-    sorted_faces = [sorted(sub_arr) for sub_arr in reindexed_faces]   
+    vertex_map = {
+        old_index: new_index 
+        for old_index, vertex_tuple in enumerate(vertices_as_tuples)
+        for new_index, sorted_vertex_tuple in enumerate(sorted_vertices_as_tuples)
+        if vertex_tuple == sorted_vertex_tuple
+    }
+    
+    reindexed_faces = [
+        [vertex_map[face[0]], vertex_map[face[1]], vertex_map[face[2]]] 
+        for face in faces
+    ]
+    sorted_faces = [sorted(sub_arr) for sub_arr in reindexed_faces]
+    
     return np.array(sorted_vertices), np.array(sorted_faces)
- 
+
  
 
 def augment_mesh(vertices, scale_factor):     

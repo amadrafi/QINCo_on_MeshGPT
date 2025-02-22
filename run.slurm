@@ -25,6 +25,6 @@ source ~/venv3.12/bin/activate
 # srun accelerate launch --multi-gpu train_shapenet.py
 # srun accelerate launch --multi-gpu continue_auto.py
 # srun accelerate launch --multi-gpu inspect_auto.py --quant lfq --codeSize 4096
-srun accelerate launch --multi-gpu continue_auto_shapenet.py --quant qinco --codeSize 4096
-
+# srun accelerate launch --multi-gpu train_shapenet.py --quant lfq --codeSize 8192 --data shapenet
+srun accelerate launch --multi-gpu generate_mesh.py --quant lfq --codeSize 4096 --data shapenet
 

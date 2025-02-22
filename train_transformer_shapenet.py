@@ -77,7 +77,7 @@ def main():
     total_params = f"{total_params / 1000000:.1f}M"
     
     # Increase the dataset size by replicating it (if desired)
-    dataset.data = [dict(d) for d in dataset.data] * 10
+    dataset.data = [dict(d) for d in dataset.data] * 5
     if accelerator.is_main_process:
         print(f"Total parameters: {total_params}")
         print(f"Length of dataset: {len(dataset.data)}")

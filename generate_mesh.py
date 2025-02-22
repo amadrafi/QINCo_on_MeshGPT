@@ -153,7 +153,7 @@ def main():
     if accelerator.is_main_process:
         print(f"Successfully loaded model {quant} @ {codeSize}")
 
-    folder = working_dir / 'renders'
+    folder = './renders'
     obj_file_path = Path(folder)
     obj_file_path.mkdir(exist_ok = True, parents = True)  
     
@@ -162,7 +162,7 @@ def main():
         print(f"Generating {text}") 
         text_coords.append(transformer.generate(texts = [text],  temperature = 0.0))   
         
-    mesh_render.save_rendering(f'{folder}/3d_models_all.obj', text_coords)
+    mesh_render.save_rendering(f'{folder}/results_{args.data}_{quant}_{codeSize}.obj', text_coords)
 
 if __name__ == "__main__":
     main()

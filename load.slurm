@@ -8,7 +8,7 @@
 #SBATCH --partition=PGR-Standard               # Partition (use appropriate partition)
 #SBATCH --ntasks=1                      # Number of tasks (adjust as needed)
 #SBATCH --cpus-per-task=1                 # Number of CPUs per task
-#SBATCH --gpus-per-node=8
+#SBATCH --gpus-per-node=2
 
 # Print job details
 echo "SLURM Job ID: $SLURM_JOB_ID"
