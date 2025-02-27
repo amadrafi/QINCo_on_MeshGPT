@@ -736,19 +736,22 @@ class MeshAutoencoder(Module):
         derived_features = get_derived_face_features(face_coords)
 
         discrete_angle = self.discretize_angle(derived_features['angles'])
+        discrete_angle = discrete_angle.to(self.angle_embed.weight.device)
         angle_embed = self.angle_embed(discrete_angle)
 
         discrete_area = self.discretize_area(derived_features['area'])
+        discrete_area = discrete_area.to(self.area_embed.weight.device)
         area_embed = self.area_embed(discrete_area)
 
         discrete_normal = self.discretize_normals(derived_features['normals'])
+        discrete_normal = discrete_normal.to(self.normal_embed.weight.device)
         normal_embed = self.normal_embed(discrete_normal)
 
         # discretize vertices for face coordinate embedding
 
         discrete_face_coords = self.discretize_face_coords(face_coords)
         discrete_face_coords = rearrange(discrete_face_coords, 'b nf nv c -> b nf (nv c)') # 9 or 12 coordinates per face
-
+        discrete_face_coords = discrete_face_coords.to(self.coor_embed.weight.device)
         face_coor_embed = self.coor_embed(discrete_face_coords)
         face_coor_embed = rearrange(face_coor_embed, 'b nf c d -> b nf (c d)')
 
@@ -774,10 +777,11 @@ class MeshAutoencoder(Module):
 
         orig_face_embed_shape = face_embed.shape[:2]
 
+        face_mask = face_mask.to(face_embed.device)
         face_embed = face_embed[face_mask]
 
         # initial sage conv followed by activation and norm
-
+        face_edges = face_edges.to(face_embed.device)
         face_embed = self.init_sage_conv(face_embed, face_edges)
 
         face_embed = self.init_encoder_act_and_norm(face_embed)
@@ -837,6 +841,8 @@ class MeshAutoencoder(Module):
         face_embed = rearrange(face_embed, 'b ... d -> b (...) d')
 
         # Compute scatter mean for vertices
+        faces_with_dim = faces_with_dim.to(vertices.device)
+        face_embed = face_embed.to(vertices.device)
         averaged_vertices = scatter_mean(vertices, faces_with_dim, face_embed, dim=-2)
 
         # Flatten for quantization

@@ -49,7 +49,7 @@ def main():
  
     working_dir = Path(working_dir)
     working_dir.mkdir(exist_ok = True, parents = True)
-    dataset_path = working_dir / ("ShapeNetCore.v1.npz")
+    dataset_path = working_dir / ("ShapeNetCore.v1_200.npz")
 
     if not os.path.isfile(dataset_path):
         data = load_shapenet("./shapenet/ShapeNetCore.v1", 50, 10)

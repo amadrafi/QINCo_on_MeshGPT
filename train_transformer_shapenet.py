@@ -41,14 +41,15 @@ def main():
     accelerator = Accelerator()
     device = accelerator.device
 
-    if accelerator.is_main_process:
-        print(f"Experiment: {quant} @ {codeSize} with {project_name}")
  
     project_name = "shapenet/ShapeNetCore.v1" 
     working_dir = f'./{project_name}'
     working_dir = Path(working_dir)
     working_dir.mkdir(exist_ok = True, parents = True)
-    dataset_path = working_dir / ("ShapeNetCore.v1.npz")
+    dataset_path = working_dir / ("ShapeNetCore.v1_200.npz")
+
+    if accelerator.is_main_process:
+        print(f"Experiment: {quant} @ {codeSize} with {project_name}")
 
     if not os.path.isfile(dataset_path):
         data = load_shapenet("./shapenet/ShapeNetCore.v1", 50, 10)
@@ -113,7 +114,7 @@ def main():
         dropout=0.0,
         text_condition_model_types="bge", 
         text_condition_cond_drop_prob=0.0
-    ) 
+    ).to(device)
     
     total_params = sum(p.numel() for p in transformer.decoder.parameters())
     total_params = f"{total_params / 1000000:.1f}M"
@@ -125,6 +126,9 @@ def main():
     dataset.generate_codes(autoencoder, batch_size=50)
     if accelerator.is_main_process:
         print(dataset.data[0].keys())
+    
+    pkg = torch.load(str(f'{working_dir}/mesh-transformer_shapenet_{quant}_{codeSize}.ckpt.pt'), weights_only=True) 
+    transformer.load_state_dict(pkg['model'])
 
     batch_size = 2  # Max 64
     grad_accum_every = 16

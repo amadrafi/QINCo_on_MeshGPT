@@ -217,6 +217,7 @@ class QINCoStep(nn.Module):
             # Use the efficient distance computation
             residual_norm = (residual_chunk ** 2).sum(dim=1, keepdim=True)  # [chunk_size, 1]
             codebook_norm = (self.codebook ** 2).sum(dim=1).unsqueeze(0)  # [1, codebook_size]
+            residual_chunk = residual_chunk.to(self.codebook.device)
             inner_prod = residual_chunk @ self.codebook.t()  # [chunk_size, codebook_size]
             dist_chunk = residual_norm + codebook_norm - 2 * inner_prod  # [chunk_size, codebook_size]
             

@@ -59,7 +59,7 @@ def main():
     if args.data == "demo_mesh":
         dataset_path = working_dir / (project_name + ".npz")
     elif args.data == "shapenet":
-        dataset_path = working_dir / ("ShapeNetCore.v1.npz")
+        dataset_path = working_dir / ("ShapeNetCore.v1_200.npz")
 
     if not os.path.isfile(dataset_path):
         if args.data == "demo_mesh":
@@ -160,7 +160,7 @@ def main():
     text_coords = [] 
     for text in labels[:10]:
         print(f"Generating {text}") 
-        text_coords.append(transformer.generate(texts = [text],  temperature = 0.0))   
+        text_coords.append(transformer.generate(texts = [text],  temperature = 0.4))   
         
     mesh_render.save_rendering(f'{folder}/results_{args.data}_{quant}_{codeSize}.obj', text_coords)
 
