@@ -7,6 +7,13 @@ __pycache__/
 *.so
 *.slurm
 
+# logs
+logs/
+metrics/
+renders/
+
+*.slurm
+
 # Distribution / packaging
 .Python
 build/

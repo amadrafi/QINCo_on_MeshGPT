@@ -586,7 +586,7 @@ class MeshAutoencoder(Module):
             _D=dim_codebook,             # Dimension of input vectors
             _M=num_quantizers,           # Number of quantization steps
             codebook_size=codebook_size, # Size of each step's codebook
-            B=8,                         # Beam size (adjust as needed)
+            B=2,                         # Beam size (adjust as needed)
             A=None,                      # Sub-step candidates (optional)
             qinco1_mode=False,           # Use default mode for QINCo
             codebook_noise_init=0.1,     # Initialization noise for codebook

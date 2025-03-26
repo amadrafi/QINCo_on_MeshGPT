@@ -1,12 +1,18 @@
 from torch.utils.data import Dataset
 import numpy as np  
 from torch.nn.utils.rnn import pad_sequence
+import matplotlib.pyplot as plt
+from scipy import stats
+from scipy.stats import gaussian_kde
 from tqdm import tqdm
 import torch
 from meshgpt_pytorch import ( 
     MeshAutoencoder,
     MeshTransformer
 )
+
+
+from collections import defaultdict
 
 from meshgpt_pytorch.data import ( 
     derive_face_edges_from_faces
@@ -151,3 +157,81 @@ class MeshDataset(Dataset):
                 
         self.sort_dataset_keys()
         print(f"[MeshDataset] Generated {len(text_embedding_dict)} text_embeddings") 
+
+    def faces_statistics(self):
+        """
+        Calculates the average and standard deviation of the number of faces per model in the dataset.
+
+        Returns:
+            tuple: (average_faces, std_faces) where:
+                - average_faces (float): The average number of faces per model.
+                - std_faces (float): The standard deviation of the number of faces per model.
+        """
+        if not self.data:
+            print("[MeshDataset] Dataset is empty. Cannot compute face statistics.")
+            return 0.0, 0.0
+
+        face_counts = [item['faces'].shape[0] for item in self.data if 'faces' in item]
+
+        if not face_counts:
+            print("[MeshDataset] No models with faces found. Cannot compute statistics.")
+            return 0.0, 0.0
+
+        median_faces = np.median(face_counts)
+        mode_faces = stats.mode(face_counts)
+
+
+        average_faces = np.mean(face_counts)
+        std_faces = np.std(face_counts)
+
+        print(f"[MeshDataset] Average faces per model: {average_faces:.2f}")
+        print(f"[MeshDataset] Standard deviation of faces per model: {std_faces:.2f}")
+        print(f"[MeshDataset] Median faces: {median_faces:.2f}")
+        print(f"[MeshDataset] Mode faces: {mode_faces:.2f}")
+
+        return average_faces, std_faces
+
+    def draw_diagram(face_counts, plot_kde=True, save_path="renders/face_counts_distribution.png", density=False):
+        """
+        Draws a histogram of the distribution of face counts with an optional kernel density estimate (KDE)
+        overlay, and saves the figure to a file.
+
+        Args:
+            face_counts (list or array): A list or array containing the face counts, or dictionaries 
+                                        where each dictionary has a 'faces' key.
+            plot_kde (bool): If True, overlays a KDE curve on the histogram. (Typically used when density=True.)
+            save_path (str): File path to save the generated figure.
+            density (bool): If True, the histogram will be normalized to represent probability density;
+                            if False, it will show raw counts.
+        """
+        # If the input is a list of dictionaries, extract the face counts.
+        if face_counts and isinstance(face_counts[0], dict):
+            extracted_face_counts = []
+            for item in face_counts:
+                if 'faces' in item and hasattr(item['faces'], 'shape'):
+                    extracted_face_counts.append(item['faces'].shape[0])
+                else:
+                    print("Skipping item without proper 'faces' key or shape attribute.")
+            face_counts = extracted_face_counts
+
+        # Convert to a NumPy array of float values.
+        face_counts = np.asarray(face_counts, dtype=np.float64)
+
+        plt.figure(figsize=(8, 6))
+        # Plot histogram; if density=True, the y-axis will show probability density.
+        n, bins, patches = plt.hist(face_counts, bins='auto', density=density,
+                                    alpha=0.6, color='g', edgecolor='black')
+        plt.title('Distribution of Face Counts')
+        plt.xlabel('Number of Faces')
+        plt.ylabel('Density' if density else 'Count')
+
+        # Only plot the KDE overlay if using density normalization.
+        if plot_kde and density:
+            density_est = gaussian_kde(face_counts)
+            xs = np.linspace(face_counts.min(), face_counts.max(), 200)
+            plt.plot(xs, density_est(xs), 'k--', label='KDE')
+            plt.legend()
+
+        plt.savefig(save_path)
+        print(f"Saved histogram at: {save_path}")
+        plt.close()

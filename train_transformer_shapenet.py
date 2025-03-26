@@ -106,12 +106,12 @@ def main():
         dim=768,
         coarse_pre_gateloop_depth=3,  
         fine_pre_gateloop_depth=3,  
-        attn_depth=12,  
-        attn_heads=12,  
+        attn_depth=14,  
+        attn_heads=14,  
         max_seq_len=max_seq, 
         condition_on_text=True, 
         gateloop_use_heinsen=False,
-        dropout=0.0,
+        dropout=0.1,
         text_condition_model_types="bge", 
         text_condition_cond_drop_prob=0.0
     ).to(device)
@@ -119,7 +119,7 @@ def main():
     total_params = sum(p.numel() for p in transformer.decoder.parameters())
     total_params = f"{total_params / 1000000:.1f}M"
     if accelerator.is_main_process:
-        print(f"Decoder total parameters: {total_params}")
+        print(f"Decoder total parameters: {total_params}, attn heads = 14, dropout = 0.1")
 
     labels = list(set(item["texts"] for item in dataset.data))
     dataset.embed_texts(transformer, batch_size=25)
@@ -127,11 +127,11 @@ def main():
     if accelerator.is_main_process:
         print(dataset.data[0].keys())
     
-    pkg = torch.load(str(f'{working_dir}/mesh-transformer_shapenet_{quant}_{codeSize}.ckpt.pt'), weights_only=True) 
-    transformer.load_state_dict(pkg['model'])
+    # pkg = torch.load(str(f'{working_dir}/mesh-transformer_shapenet_{quant}_{codeSize}.pt'), weights_only=True) 
+    # transformer.load_state_dict(pkg['model'])
 
     batch_size = 2  # Max 64
-    grad_accum_every = 16
+    grad_accum_every = 8
     
     # Set the maximal batch size (max 64) that your VRAM can handle, and use grad_accum_every to create an effective batch size of 64 (e.g., 4 * 16 = 64)
     learning_rate = 1e-2  # Start training with a higher learning rate, then lower it if stagnation occurs.
@@ -144,15 +144,15 @@ def main():
         grad_accum_every=grad_accum_every,
         learning_rate=learning_rate,
         batch_size=batch_size,
-        checkpoint_every_epoch=5,
+        checkpoint_every_epoch=10,
         # Uncomment below for FP16 training if desired (note: may cause nan issues)
         # accelerator_kwargs={"mixed_precision": "fp16"},
         # optimizer_kwargs={"eps": 1e-7}
     )
-    loss = trainer.train(300, stop_at_loss=0.0001)
+    loss = trainer.train(1000, stop_at_loss=0.0001)
 
     # Save the trained transformer model.
-    save_path = working_dir / f"mesh-transformer_shapenet_{quant}_{codeSize}.pt"
+    save_path = working_dir / f"mesh-transformer_shapenet_{quant}_{codeSize}_attn_24_dropout.pt"
     trainer.save(str(save_path))   
 
 if __name__ == "__main__":

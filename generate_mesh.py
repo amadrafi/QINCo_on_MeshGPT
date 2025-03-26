@@ -5,6 +5,7 @@ import os
 import csv
 import json
 import gc
+import random 
 from collections import OrderedDict
 from accelerate import Accelerator
 from accelerate.utils import DistributedDataParallelKwargs
@@ -21,10 +22,23 @@ from meshgpt_pytorch.data import (
     derive_face_edges_from_faces
 )
 import argparse  # Added for command-line arguments
+
 from helper import get_mesh, augment_mesh, load_shapenet, load_filename
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    # For CUDA determinism (may slow down performance)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
 ##  MAIN FUNCTION
 def main():
+
+    set_seed(42)
     # Parse command-line arguments for quant and codeSize.
     parser = argparse.ArgumentParser(description="Mesh GPT Training Script")
     parser.add_argument("--quant", type=str, default="lfq", choices=["lfq", "qinco", "rvq"],
@@ -138,7 +152,12 @@ def main():
     if accelerator.is_main_process:
         print(f"Decoder total parameters: {total_params}")
 
-    labels = list(set(item["texts"] for item in dataset.data))
+    # labels = list(set(item["texts"] for item in dataset.data))
+    labels = sorted(set(item["texts"] for item in dataset.data))
+
+    rng = random.Random(42)
+    rng.shuffle(labels)
+
     dataset.embed_texts(transformer, batch_size=25)
     dataset.generate_codes(autoencoder, batch_size=50)
     if accelerator.is_main_process:
@@ -159,10 +178,11 @@ def main():
     
     text_coords = [] 
     for text in labels[:10]:
+        print(text)
         print(f"Generating {text}") 
-        text_coords.append(transformer.generate(texts = [text],  temperature = 0.4))   
+        text_coords.append(transformer.generate(texts = [text],  temperature = 0.1))   
         
-    mesh_render.save_rendering(f'{folder}/results_{args.data}_{quant}_{codeSize}.obj', text_coords)
+    mesh_render.save_rendering(f'{folder}/results_{args.data}_{quant}_{codeSize}_original.obj', text_coords)
 
 if __name__ == "__main__":
     main()
